@@ -1,0 +1,45 @@
+Index: memory_profiler-0.57.0/memory_profiler.py
+===================================================================
+--- memory_profiler-0.57.0.orig/memory_profiler.py
++++ memory_profiler-0.57.0/memory_profiler.py
+@@ -89,7 +89,7 @@ class MemitResult(object):
+         p.text(u'<MemitResult : ' + msg + u'>')
+ 
+ 
+-def _get_child_memory(process, meminfo_attr=None):
++def _get_child_memory(process, meminfo_attr=None, with_names=False):
+     """
+     Returns a generator that yields memory for all child processes.
+     """
+@@ -109,10 +109,18 @@ def _get_child_memory(process, meminfo_a
+     # Loop over the child processes and yield their memory
+     try:
+         for child in getattr(process, children_attr)(recursive=True):
+-            yield getattr(child, meminfo_attr)()[0] / _TWO_20
++            if with_names:
++               cmdline = child.cmdline()
++               chname = cmdline[-1] if len(cmdline) > 2 else "None"
++               yield (chname.replace(" ", "_"), getattr(child, meminfo_attr)()[0] / _TWO_20)
++            else:
++               yield getattr(child, meminfo_attr)()[0] / _TWO_20
+     except (psutil.NoSuchProcess, psutil.AccessDenied):
+         # https://github.com/fabianp/memory_profiler/issues/71
+-        yield 0.0
++        if with_names:
++           yield ("None", 0.0)
++        else:
++           yield 0.0
+ 
+ 
+ def _get_memory(pid, backend, timestamps=False, include_children=False, filename=None):
+@@ -375,8 +383,8 @@ def memory_usage(proc=-1, interval=.1, t
+ 
+                     # Write children to the stream file
+                     if multiprocess:
+-                        for idx, chldmem in enumerate(_get_child_memory(proc.pid)):
+-                            stream.write("CHLD {0} {1:.6f} {2:.4f}\n".format(idx, chldmem, time.time()))
++                        for idx, chldmem in enumerate(_get_child_memory(proc.pid, with_names=True)):
++                            stream.write("CHLD {0} {1:.6f} {2:.4f}\n".format(chldmem[0], chldmem[1], time.time()))
+                 else:
+                     # Create a nested list with the child memory
+                     if multiprocess:
